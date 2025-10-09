@@ -1,0 +1,103 @@
+# Model Configuration
+model:
+  version: "1.0.0"
+  type: "xgboost"
+  random_state: 42
+
+# Data Processing
+data:
+  test_size: 0.2
+  validation_size: 0.1
+  stratify: true
+  handle_missing: "drop"  # drop, mean, median, mode
+  
+# Feature Engineering
+features:
+  numerical:
+    - tenure
+    - monthly_charges
+    - total_charges
+  
+  categorical:
+    - contract_type
+    - payment_method
+    - internet_service
+    - online_security
+    - tech_support
+    - device_protection
+    - streaming_tv
+    - streaming_movies
+  
+  create_interactions: true
+  polynomial_degree: 2
+  
+# Class Imbalance
+imbalance:
+  method: "smote"  # smote, undersampling, class_weights
+  sampling_strategy: 0.8
+  
+# XGBoost Parameters
+xgboost:
+  n_estimators: 200
+  max_depth: 6
+  learning_rate: 0.1
+  subsample: 0.8
+  colsample_bytree: 0.8
+  min_child_weight: 1
+  gamma: 0
+  objective: "binary:logistic"
+  eval_metric: "auc"
+  
+# LightGBM Parameters
+lightgbm:
+  n_estimators: 200
+  max_depth: 6
+  learning_rate: 0.1
+  num_leaves: 31
+  min_child_samples: 20
+  subsample: 0.8
+  colsample_bytree: 0.8
+  
+# Random Forest Parameters
+random_forest:
+  n_estimators: 200
+  max_depth: 10
+  min_samples_split: 10
+  min_samples_leaf: 4
+  max_features: "sqrt"
+  
+# Hyperparameter Tuning
+tuning:
+  method: "optuna"  # optuna, grid, random
+  n_trials: 100
+  timeout: 3600
+  cv_folds: 5
+  
+# Evaluation
+evaluation:
+  metrics:
+    - roc_auc
+    - precision
+    - recall
+    - f1
+    - accuracy
+  threshold: 0.5
+  
+# MLflow
+mlflow:
+  experiment_name: "churn-prediction"
+  tracking_uri: "http://localhost:5000"
+  registry_model_name: "churn_model"
+  
+# Explainability
+explainability:
+  enable_shap: true
+  enable_lime: true
+  n_samples: 100
+  
+# Monitoring
+monitoring:
+  enable: true
+  drift_threshold: 0.05
+  performance_threshold: 0.85
+  alert_email: "alerts@company.com"
