@@ -10,6 +10,8 @@ data:
   validation_size: 0.1
   stratify: true
   handle_missing: "drop"  # drop, mean, median, mode
+  processed_test: "data/processed/churn_engineered.csv"   # <-- add this line
+
   
 # Feature Engineering
 features:
