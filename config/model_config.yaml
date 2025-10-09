@@ -85,12 +85,11 @@ evaluation:
     - accuracy
   threshold: 0.5
   
-# MLflow
 mlflow:
   experiment_name: "churn-prediction"
-  tracking_uri: "http://localhost:5000"
+  tracking_uri: "file:///D:/Customer Churn Prediction/mlruns"
   registry_model_name: "churn_model"
-  
+
 # Explainability
 explainability:
   enable_shap: true
