@@ -25,20 +25,52 @@ feature_names = joblib.load(FEATURE_NAMES_PATH)
 # =========================
 # Streamlit Page Config
 # =========================
-st.set_page_config(page_title="Customer Churn Prediction", page_icon="💼", layout="centered")
-st.title("📊 Customer Churn Prediction App")
-st.markdown("Enter customer details below to predict the likelihood of churn.")
+st.set_page_config(page_title="Customer Churn Prediction", page_icon="💼", layout="wide")
+st.markdown("""
+    <style>
+    .stApp {
+        background: linear-gradient(to right, #f8fafc, #e0f2fe);
+        color: #1f2937;
+    }
+    .header-title {
+        font-size: 2.5rem;
+        color: #1e3a8a;
+        font-weight: bold;
+        text-align: center;
+    }
+    .header-subtitle {
+        font-size: 1.2rem;
+        text-align: center;
+        color: #475569;
+    }
+    .stButton>button {
+        background-color: #1e3a8a;
+        color: white;
+        font-weight: bold;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # =========================
-# Input Form
+# Header
 # =========================
-with st.form("input_form"):
-    st.subheader("Customer Information")
+st.markdown("<div class='header-title'>📊 Customer Churn Prediction</div>", unsafe_allow_html=True)
+st.markdown("<div class='header-subtitle'>Predict the likelihood of a customer leaving your service</div>", unsafe_allow_html=True)
+st.markdown("---")
 
+# =========================
+# Sidebar Form
+# =========================
+with st.sidebar.form("input_form"):
+    st.header("📝 Customer Information")
+    
     gender = st.selectbox("Gender", ["Male", "Female"])
     senior = st.selectbox("Senior Citizen", ["No", "Yes"])
     partner = st.selectbox("Has Partner", ["No", "Yes"])
     dependents = st.selectbox("Has Dependents", ["No", "Yes"])
+    
+    st.markdown("---")
+    st.subheader("📡 Service Details")
     tenure = st.number_input("Tenure (months)", min_value=0, max_value=72, value=12)
     phone_service = st.selectbox("Phone Service", ["Yes", "No"])
     internet_service = st.selectbox("Internet Service", ["DSL", "Fiber optic", "No"])
@@ -48,16 +80,18 @@ with st.form("input_form"):
         "Payment Method",
         ["Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"]
     )
+    
+    st.markdown("---")
+    st.subheader("💰 Charges")
     monthly_charges = st.number_input("Monthly Charges ($)", min_value=0.0, value=70.0)
     total_charges = st.number_input("Total Charges ($)", min_value=0.0, value=1500.0)
-
+    
     submitted = st.form_submit_button("🔮 Predict Churn")
 
 # =========================
-# Prediction Logic
+# Prediction Logic (unchanged)
 # =========================
 if submitted:
-    # Create input DataFrame
     input_dict = {
         "gender": gender,
         "SeniorCitizen": 1 if senior == "Yes" else 0,
@@ -98,11 +132,17 @@ if submitted:
     prob = model.predict_proba(X_scaled)[0][1]
     pred = "Yes" if prob > 0.5 else "No"
 
+    # =========================
     # Display results
+    # =========================
     st.markdown("---")
-    st.subheader(f"Prediction: **{pred}**")
-    st.metric("Churn Probability", f"{prob*100:.2f}%")
-
+    col1, col2 = st.columns([2,1])
+    
+    with col1:
+        st.subheader(f"Prediction: **{pred}**")
+    with col2:
+        st.metric("Churn Probability", f"{prob*100:.2f}%")
+    
     if pred == "Yes":
         st.warning("⚠️ High risk of churn. Consider offering retention benefits.")
     else:
