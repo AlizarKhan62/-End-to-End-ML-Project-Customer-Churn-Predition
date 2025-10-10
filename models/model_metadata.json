@@ -1,7 +1,7 @@
 {
   "model_version": "1.0.0",
   "model_type": "xgboost",
-  "training_date": "2025-10-09T18:09:57.792310",
+  "training_date": "2025-10-10T09:48:53.648909",
   "data_shape": {
     "n_samples": 7043,
     "n_features": 49

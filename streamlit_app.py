@@ -1,23 +1,31 @@
 import streamlit as st
 import pandas as pd
-import joblib
 import numpy as np
+import os
+import joblib
 
 # =========================
-# Load trained model & artifacts
+# Paths
 # =========================
-MODEL_PATH = "models/best_model.pkl"
-SCALER_PATH = "models/artifacts/scaler.pkl"
-ENCODERS_PATH = "models/artifacts/label_encoders.pkl"
-FEATURES_PATH = "models/artifacts/feature_names.pkl"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+MODEL_PATH = os.path.join(BASE_DIR, "models", "artifacts", "best_model.pkl")
+SCALER_PATH = os.path.join(BASE_DIR, "models", "artifacts", "scaler.pkl")
+ENCODERS_PATH = os.path.join(BASE_DIR, "models", "artifacts", "label_encoders.pkl")
+FEATURE_NAMES_PATH = os.path.join(BASE_DIR, "models", "artifacts", "feature_names.pkl")
+
+# =========================
+# Load artifacts
+# =========================
 model = joblib.load(MODEL_PATH)
 scaler = joblib.load(SCALER_PATH)
-encoders = joblib.load(ENCODERS_PATH)
-feature_names = joblib.load(FEATURES_PATH)
+label_encoders = joblib.load(ENCODERS_PATH)
+feature_names = joblib.load(FEATURE_NAMES_PATH)
 
+# =========================
+# Streamlit Page Config
+# =========================
 st.set_page_config(page_title="Customer Churn Prediction", page_icon="💼", layout="centered")
-
 st.title("📊 Customer Churn Prediction App")
 st.markdown("Enter customer details below to predict the likelihood of churn.")
 
@@ -68,19 +76,19 @@ if submitted:
     input_df = pd.DataFrame([input_dict])
 
     # Encode categorical columns
-    for col, le in encoders.items():
+    for col, le in label_encoders.items():
         if col in input_df.columns:
             try:
                 input_df[col] = le.transform(input_df[col])
             except Exception:
-                # handle unseen values
                 input_df[col] = le.transform([le.classes_[0]])
 
-    # Align columns with training features
+    # Add missing engineered columns if any
     for col in feature_names:
         if col not in input_df.columns:
-            input_df[col] = 0  # fill missing engineered columns
+            input_df[col] = 0
 
+    # Reorder columns
     input_df = input_df[feature_names]
 
     # Scale numeric features
@@ -90,7 +98,7 @@ if submitted:
     prob = model.predict_proba(X_scaled)[0][1]
     pred = "Yes" if prob > 0.5 else "No"
 
-    # Display
+    # Display results
     st.markdown("---")
     st.subheader(f"Prediction: **{pred}**")
     st.metric("Churn Probability", f"{prob*100:.2f}%")

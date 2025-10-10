@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/Customer Churn Prediction/mlruns/503910214298503935/9b398dc085a8445fa9b3d2d20cf5d714/artifacts
+end_time: 1760071385531
+entry_point_name: ''
+experiment_id: '503910214298503935'
+lifecycle_stage: active
+run_id: 9b398dc085a8445fa9b3d2d20cf5d714
+run_name: xgboost
+run_uuid: 9b398dc085a8445fa9b3d2d20cf5d714
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1760071377231
+status: 3
+tags: []
+user_id: Admin
