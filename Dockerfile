@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt \
 # =========================
 # Production stage
 # =========================
-FROM python:3.9-slim
+FROM python:3.10-slim
 
 WORKDIR /app
 
@@ -33,7 +33,7 @@ COPY --from=builder /install /usr/local
 COPY api/ ./api/
 COPY src/ ./src/
 COPY models/ ./models/
-COPY configs/ ./configs/
+COPY config/ ./configs/
 
 # Set PATH
 ENV PATH=/usr/local/bin:$PATH
