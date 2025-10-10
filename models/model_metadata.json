@@ -1,0 +1,159 @@
+{
+  "model_version": "1.0.0",
+  "model_type": "xgboost",
+  "training_date": "2025-10-09T18:09:57.792310",
+  "data_shape": {
+    "n_samples": 7043,
+    "n_features": 49
+  },
+  "performance": {
+    "roc_auc": 0.9
+  },
+  "feature_names": [
+    "gender",
+    "SeniorCitizen",
+    "Partner",
+    "Dependents",
+    "tenure",
+    "PhoneService",
+    "MultipleLines",
+    "InternetService",
+    "OnlineSecurity",
+    "OnlineBackup",
+    "DeviceProtection",
+    "TechSupport",
+    "StreamingTV",
+    "StreamingMovies",
+    "Contract",
+    "PaperlessBilling",
+    "PaymentMethod",
+    "MonthlyCharges",
+    "TotalCharges",
+    "tenure_squared",
+    "tenure_sqrt",
+    "tenure_log",
+    "tenure_group",
+    "charges_ratio",
+    "charges_diff",
+    "high_monthly_charges",
+    "high_total_charges",
+    "total_services",
+    "service_usage_score",
+    "contract_risk",
+    "estimated_clv",
+    "potential_clv",
+    "clv_at_risk",
+    "tenure_x_MonthlyCharges",
+    "tenure_x_TotalCharges",
+    "MonthlyCharges_x_TotalCharges",
+    "tenure^2",
+    "tenure MonthlyCharges",
+    "MonthlyCharges^2",
+    "gender_zscore",
+    "SeniorCitizen_zscore",
+    "Partner_zscore",
+    "Dependents_zscore",
+    "tenure_zscore",
+    "PhoneService_zscore",
+    "MultipleLines_zscore",
+    "InternetService_zscore",
+    "OnlineSecurity_zscore",
+    "OnlineBackup_zscore"
+  ],
+  "config": {
+    "model": {
+      "version": "1.0.0",
+      "type": "xgboost",
+      "random_state": 42
+    },
+    "data": {
+      "test_size": 0.2,
+      "validation_size": 0.1,
+      "stratify": true,
+      "handle_missing": "drop",
+      "processed_test": "data/processed/churn_engineered.csv"
+    },
+    "features": {
+      "numerical": [
+        "tenure",
+        "monthly_charges",
+        "total_charges"
+      ],
+      "categorical": [
+        "contract_type",
+        "payment_method",
+        "internet_service",
+        "online_security",
+        "tech_support",
+        "device_protection",
+        "streaming_tv",
+        "streaming_movies"
+      ],
+      "create_interactions": true,
+      "polynomial_degree": 2
+    },
+    "imbalance": {
+      "method": "smote",
+      "sampling_strategy": 0.8
+    },
+    "xgboost": {
+      "n_estimators": 200,
+      "max_depth": 6,
+      "learning_rate": 0.1,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "min_child_weight": 1,
+      "gamma": 0,
+      "objective": "binary:logistic",
+      "eval_metric": "auc"
+    },
+    "lightgbm": {
+      "n_estimators": 200,
+      "max_depth": 6,
+      "learning_rate": 0.1,
+      "num_leaves": 31,
+      "min_child_samples": 20,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8
+    },
+    "random_forest": {
+      "n_estimators": 200,
+      "max_depth": 10,
+      "min_samples_split": 10,
+      "min_samples_leaf": 4,
+      "max_features": "sqrt"
+    },
+    "tuning": {
+      "method": "optuna",
+      "n_trials": 100,
+      "timeout": 3600,
+      "cv_folds": 5
+    },
+    "evaluation": {
+      "metrics": [
+        "roc_auc",
+        "precision",
+        "recall",
+        "f1",
+        "accuracy"
+      ],
+      "threshold": 0.5
+    },
+    "mlflow": {
+      "experiment_name": "churn-prediction",
+      "tracking_uri": "file:///D:/Customer Churn Prediction/mlruns",
+      "registry_model_name": "churn_model"
+    },
+    "explainability": {
+      "enable_shap": true,
+      "enable_lime": true,
+      "n_samples": 100
+    },
+    "monitoring": {
+      "enable": true,
+      "drift_threshold": 0.05,
+      "performance_threshold": 0.85,
+      "alert_email": "alerts@company.com"
+    }
+  }
+}

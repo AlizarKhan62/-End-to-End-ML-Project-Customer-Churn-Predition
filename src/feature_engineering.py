@@ -8,7 +8,6 @@ import numpy as np
 from sklearn.preprocessing import PolynomialFeatures
 import logging
 
-logger = logging.getLogger(__name__)
 
 class FeatureEngineer:
     """Advanced feature engineering"""
@@ -17,6 +16,7 @@ class FeatureEngineer:
         self.config = config
         self.poly_features = None
         self.feature_names = []
+        self.logger = logging.getLogger(__name__)  # ✅ FIXED: Added logger instance
 
     def create_interaction_features(self, df: pd.DataFrame, numerical_cols: list) -> pd.DataFrame:
         """Create interaction features between numerical columns"""
@@ -26,7 +26,7 @@ class FeatureEngineer:
                 if col1 in df.columns and col2 in df.columns:
                     new_col = f"{col1}_x_{col2}"
                     df[new_col] = df[col1] * df[col2]
-                    logger.info(f"Created interaction: {new_col}")
+                    self.logger.info(f"Created interaction: {new_col}")
         return df
 
     def create_polynomial_features(self, df: pd.DataFrame, numerical_cols: list, degree: int = 2) -> pd.DataFrame:
@@ -45,7 +45,7 @@ class FeatureEngineer:
             index=df.index
         )
         df = pd.concat([df, poly_df], axis=1)
-        logger.info(f"Created {len(poly_df.columns)} polynomial features")
+        self.logger.info(f"Created {len(poly_df.columns)} polynomial features")
         return df
 
     def create_tenure_features(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -72,35 +72,23 @@ class FeatureEngineer:
             }
             df['tenure_group'] = df['tenure_group'].map(tenure_map)
 
-            logger.info("Created tenure-based features")
+            self.logger.info("Created tenure-based features")
         return df
 
-    def create_charge_features(self, df: pd.DataFrame) -> pd.DataFrame:
-    """Create charge-based features"""
-    df = df.copy()
-    
-    if 'monthly_charges' in df.columns and 'total_charges' in df.columns:
-        # Ratio features
-        df['avg_monthly_charges'] = df['total_charges'] / (df['tenure'] + 1)
-        df['charge_to_tenure_ratio'] = df['monthly_charges'] / (df['tenure'] + 1)
-        
-        # Difference from average
-        df['charge_diff_from_avg'] = df['monthly_charges'] - df['monthly_charges'].mean()
-        
-        # Price bins (numeric encoding instead of strings)
-        price_bins = [0, 30, 60, 90, 150]
-        price_labels = ['Low', 'Medium', 'High', 'Premium']
-        df['price_category'] = pd.cut(df['monthly_charges'], bins=price_bins, labels=price_labels)
-        
-        # Map to numeric values
-        price_map = {'Low': 1, 'Medium': 2, 'High': 3, 'Premium': 4}
-        df['price_category'] = df['price_category'].astype(str).map(price_map)
-        
-        logger.info("Created charge-based features (numeric price category)")
-    
-    return df
-
-
+    def create_charge_features(self, df):
+        """Create charge-based features"""
+        if 'MonthlyCharges' in df.columns and 'TotalCharges' in df.columns:
+            try:
+                df['charges_ratio'] = df['TotalCharges'] / (df['MonthlyCharges'] + 1e-5)
+                df['charges_diff'] = df['TotalCharges'] - df['MonthlyCharges']
+                df['high_monthly_charges'] = (df['MonthlyCharges'] > df['MonthlyCharges'].median()).astype(int)
+                df['high_total_charges'] = (df['TotalCharges'] > df['TotalCharges'].median()).astype(int)
+                self.logger.info("Created charge-based features")
+            except Exception as e:
+                self.logger.error(f"Error creating charge-based features: {e}")
+        else:
+            self.logger.warning("Charge columns not found in DataFrame")
+        return df
 
     def create_service_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create service-related features"""
@@ -121,7 +109,7 @@ class FeatureEngineer:
         if active_services:
             df['total_services'] = sum(active_services)
             df['service_usage_score'] = df['total_services'] / len(active_services)
-            logger.info("Created service-based features")
+            self.logger.info("Created service-based features")
         return df
 
     def create_contract_features(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -136,7 +124,7 @@ class FeatureEngineer:
                 'Two year': 0
             }
             df['contract_risk'] = df[contract_col].map(lambda x: contract_risk_map.get(x, 1))
-            logger.info("Created contract-based features")
+            self.logger.info("Created contract-based features")
         return df
 
     def create_clv_features(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -147,7 +135,7 @@ class FeatureEngineer:
             avg_lifetime = 36
             df['potential_clv'] = avg_lifetime * df['MonthlyCharges']
             df['clv_at_risk'] = df['estimated_clv'] * 0.5
-            logger.info("Created CLV features")
+            self.logger.info("Created CLV features")
         return df
 
     def create_statistical_features(self, df: pd.DataFrame, numerical_cols: list) -> pd.DataFrame:
@@ -158,12 +146,12 @@ class FeatureEngineer:
                 mean = df[col].mean()
                 std = df[col].std()
                 df[f'{col}_zscore'] = (df[col] - mean) / (std + 1e-10)
-        logger.info("Created statistical features")
+        self.logger.info("Created statistical features")
         return df
 
     def engineer_features(self, df: pd.DataFrame, fit: bool = True) -> pd.DataFrame:
         """Complete feature engineering pipeline"""
-        logger.info("Starting feature engineering")
+        self.logger.info("Starting feature engineering")
 
         numerical_cols = df.select_dtypes(include=[np.number]).columns.tolist()
 
@@ -188,5 +176,5 @@ class FeatureEngineer:
         df = self.create_statistical_features(df, new_numerical[:10])
 
         self.feature_names = df.columns.tolist()
-        logger.info(f"Feature engineering complete: {len(self.feature_names)} features")
+        self.logger.info(f"Feature engineering complete: {len(self.feature_names)} features")
         return df

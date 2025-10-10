@@ -76,6 +76,21 @@ class ModelTrainer:
         X_train, X_val, X_test, y_train, y_val, y_test = self.prepare_data(X, y)
         self.feature_names = list(X.columns)  # 👈 Save columns used during training
         X_train_scaled, X_test_scaled, X_val_scaled = self.scale_features(X_train, X_test, X_val)
+
+        # --- 🧹 Handle missing or infinite values before SMOTE ---
+        X_train_scaled = pd.DataFrame(X_train_scaled, columns=self.feature_names)
+        X_test_scaled = pd.DataFrame(X_test_scaled, columns=self.feature_names)
+        if X_val_scaled is not None:
+            X_val_scaled = pd.DataFrame(X_val_scaled, columns=self.feature_names)
+
+        for df in [X_train_scaled, X_test_scaled, X_val_scaled]:
+            if df is not None:
+                df.replace([np.inf, -np.inf], np.nan, inplace=True)
+                df.fillna(df.median(), inplace=True)
+
+        logger.info("Handled missing and infinite values before resampling")
+
+        # Balance the data
         X_train_balanced, y_train_balanced = self.handle_imbalance(X_train_scaled, y_train)
 
         with mlflow.start_run(run_name="xgboost"):
