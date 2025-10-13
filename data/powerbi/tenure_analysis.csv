@@ -1,0 +1,6 @@
+tenure_group,customer_count,churners,avg_churn_prob,churn_rate_pct
+0-12m,7043,629,0.26188603008200856,8.930853329547068
+12-24m,0,0,,
+24-48m,0,0,,
+48-72m,0,0,,
+72m+,0,0,,
