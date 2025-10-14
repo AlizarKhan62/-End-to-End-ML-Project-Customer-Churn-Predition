@@ -1,279 +1,308 @@
-#!/usr/bin/env python3
 """
-Load CSVs (or Excel if needed) and prepare exports for Power BI.
-- Reads CSV(s) from data/processed/ and data/predictions/
-- Cleans/normalizes columns to match the DB schema
-- Writes prepared CSVs into data/powerbi/
-- Optionally loads into PostgreSQL if DATABASE_URL env var is set
-
-Usage:
-  python scripts/load_data_for_powerbi.py
-  # or provide paths:
-  python scripts/load_data_for_powerbi.py --predictions data/predictions/predictions.csv --engineered data/processed/churn_engineered.csv
+Load Excel files to PostgreSQL - FIXED VERSION
+This will actually load your data!
 """
 
-import os
-import argparse
 import pandas as pd
-import numpy as np
+from sqlalchemy import create_engine, text
+import os
 from pathlib import Path
 
-# Optional DB
-import os
-DATABASE_URL = os.getenv("DATABASE_URL")  # e.g. postgresql://user:pass@host:5432/churn_analytics
+# Database connection
+DB_URL = "postgresql://postgres:postgres123@localhost:5432/churn_analytics"
+
+print("="*80)
+print("📊 LOADING YOUR EXCEL DATA TO POSTGRESQL")
+print("="*80)
+
 try:
-    from sqlalchemy import create_engine, text
-    SQLALCHEMY_AVAILABLE = True
-except Exception:
-    SQLALCHEMY_AVAILABLE = False
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-POWERBI_DIR = PROJECT_ROOT / "data" / "powerbi"
-POWERBI_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def safe_read(path: Path) -> pd.DataFrame:
-    """Read CSV or Excel safely into DataFrame."""
-    if not path.exists():
-        raise FileNotFoundError(f"File not found: {path}")
-    if path.suffix.lower() in [".csv"]:
-        return pd.read_csv(path)
-    if path.suffix.lower() in [".xls", ".xlsx"]:
-        return pd.read_excel(path)
-    # try csv by default
-    return pd.read_csv(path)
-
-
-def normalize_column_names(df: pd.DataFrame) -> pd.DataFrame:
-    """Make column names consistent (strip, remove spaces)."""
-    df = df.copy()
-    df.columns = [c.strip() for c in df.columns]
-    return df
-
-
-def prepare_predictions_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Rename and prepare predictions dataframe to match DB / Power BI schema."""
-    df = normalize_column_names(df)
-
-    # mapping common names to target names
-    column_mapping = {
-        "customerID": "customer_id",
-        "customer_id": "customer_id",
-        "gender": "gender",
-        "SeniorCitizen": "senior_citizen",
-        "Senior Citizen": "senior_citizen",
-        "Partner": "partner",
-        "Dependents": "dependents",
-        "tenure": "tenure",
-        "PhoneService": "phone_service",
-        "MultipleLines": "multiple_lines",
-        "InternetService": "internet_service",
-        "OnlineSecurity": "online_security",
-        "OnlineBackup": "online_backup",
-        "DeviceProtection": "device_protection",
-        "TechSupport": "tech_support",
-        "StreamingTV": "streaming_tv",
-        "StreamingMovies": "streaming_movies",
-        "Contract": "contract",
-        "PaperlessBilling": "paperless_billing",
-        "PaymentMethod": "payment_method",
-        "MonthlyCharges": "monthly_charges",
-        "TotalCharges": "total_charges",
-        "Churn": "churn_actual",
-        "churn": "churn_actual",
-        "churn_actual": "churn_actual",
-    }
-
-    # rename what's present
-    rename_map = {k: v for k, v in column_mapping.items() if k in df.columns}
-    if rename_map:
-        df = df.rename(columns=rename_map)
-
-    # Clean TotalCharges (string -> numeric) safely
-    if "total_charges" in df.columns:
-        df["total_charges"] = pd.to_numeric(df["total_charges"], errors="coerce")
-    else:
-        # if not present, try to create from tenure * monthly_charges as fallback
-        if "monthly_charges" in df.columns and "tenure" in df.columns:
-            df["total_charges"] = df["monthly_charges"].astype(float) * df["tenure"].astype(float)
-        else:
-            df["total_charges"] = np.nan
-
-    # Ensure monthly_charges numeric
-    if "monthly_charges" in df.columns:
-        df["monthly_charges"] = pd.to_numeric(df["monthly_charges"], errors="coerce")
-    else:
-        df["monthly_charges"] = 0.0
-
-    # churn_prediction column: if not present derive from churn_actual
-    if "churn_prediction" not in df.columns:
-        if "churn_actual" in df.columns:
-            df["churn_prediction"] = (df["churn_actual"].astype(str).str.lower().isin(["yes", "1", "true"])).astype(int)
-        else:
-            df["churn_prediction"] = 0
-
-    # churn_probability: if not present, create placeholder between 0.1 and 0.9
-    if "churn_probability" not in df.columns:
-        rng = np.random.default_rng(42)
-        df["churn_probability"] = rng.uniform(0.1, 0.9, size=len(df))
-
-    # risk_level if not present
-    if "risk_level" not in df.columns:
-        df["risk_level"] = pd.cut(
-            df["churn_probability"],
-            bins=[-1, 0.4, 0.7, 1.0],
-            labels=["Low", "Medium", "High"]
-        ).astype(str)
-
-    # convert senior flag to Yes/No
-    if "senior_citizen" in df.columns:
-        df["senior_citizen"] = df["senior_citizen"].map({0: "No", 1: "Yes", "0": "No", "1": "Yes"}).fillna(df["senior_citizen"])
-
-    # keep and order columns relevant to Power BI + DB
-    final_cols = [
-        "customer_id", "gender", "senior_citizen", "partner", "dependents", "tenure",
-        "phone_service", "multiple_lines", "internet_service", "online_security", "online_backup",
-        "device_protection", "tech_support", "streaming_tv", "streaming_movies",
-        "contract", "paperless_billing", "payment_method",
-        "monthly_charges", "total_charges",
-        "churn_actual", "churn_prediction", "churn_probability", "risk_level"
+    # Create engine
+    engine = create_engine(DB_URL)
+    print("\n✅ Connected to PostgreSQL")
+    
+    # ============================================================================
+    # STEP 1: Find your Excel file
+    # ============================================================================
+    
+    print("\n📁 Looking for your Excel files...")
+    
+    # Check common locations
+    possible_files = [
+        "data/processed/churn_engineered.xlsx",
+        "data/processed/churn_engineered.csv",
+        "data/raw/Telco-Customer-Churn.xlsx",
+        "data/raw/Telco-Customer-Churn.csv",
+        "churn_engineered.xlsx",
+        "Telco-Customer-Churn.xlsx"
     ]
-    # add any missing final columns to DF filled with NaN/0
-    for col in final_cols:
-        if col not in df.columns:
-            df[col] = np.nan if df.shape[0] > 0 else []
-
-    # return only final columns (plus any extras)
-    ordered = [c for c in final_cols if c in df.columns]
-    extras = [c for c in df.columns if c not in ordered]
-    return df[ordered + extras]
-
-
-def export_powerbi_csv(df: pd.DataFrame, filename: str):
-    out_path = POWERBI_DIR / filename
-    df.to_csv(out_path, index=False)
-    print(f"✅ Exported Power BI CSV: {out_path}")
-
-
-def load_to_postgres(df: pd.DataFrame, table_name: str):
-    if not SQLALCHEMY_AVAILABLE:
-        print("⚠️  SQLAlchemy not available; skipping DB load. Install sqlalchemy and psycopg2-binary to enable.")
-        return False
-    if not DATABASE_URL:
-        print("⚠️  DATABASE_URL env var not set; skipping DB load.")
-        return False
-    engine = create_engine(DATABASE_URL)
-    try:
-        df.to_sql(table_name, engine, if_exists="replace", index=False, method="multi", chunksize=1000)
-        print(f"✅ Loaded {len(df)} rows into table `{table_name}`")
-        return True
-    except Exception as e:
-        print(f"❌ Error loading to DB: {e}")
-        return False
-
-
-def main(args):
-    # default file locations (prefer CSVs)
-    default_predictions = PROJECT_ROOT / "data" / "predictions" / "predictions.csv"
-    default_engineered = PROJECT_ROOT / "data" / "processed" / "churn_engineered.csv"
-    default_raw = PROJECT_ROOT / "data" / "raw" / "Telco-Customer-Churn.csv"
-
-    preds_path = Path(args.predictions) if args.predictions else default_predictions
-    eng_path = Path(args.engineered) if args.engineered else default_engineered
-    raw_path = Path(args.raw) if args.raw else default_raw
-
-    # Choose which file to use (predictions preferred)
-    if preds_path.exists():
-        print(f"Reading predictions file: {preds_path}")
-        df_preds = safe_read(preds_path)
-    elif eng_path.exists():
-        print(f"No predictions found, reading engineered file: {eng_path}")
-        df_preds = safe_read(eng_path)
-    elif raw_path.exists():
-        print(f"No processed files found, reading raw file: {raw_path}")
-        df_preds = safe_read(raw_path)
+    
+    file_found = None
+    for filepath in possible_files:
+        if Path(filepath).exists():
+            file_found = filepath
+            print(f"   ✅ Found: {filepath}")
+            break
+    
+    if not file_found:
+        print("\n❌ No data file found automatically.")
+        print("\n📝 Please enter the FULL PATH to your Excel file:")
+        print("   Example: C:\\Users\\YourName\\Desktop\\churn_data.xlsx")
+        file_found = input("\n   Enter path: ").strip().strip('"').strip("'")
+        
+        if not Path(file_found).exists():
+            print(f"\n❌ File not found: {file_found}")
+            print("\n💡 Please check:")
+            print("   1. File path is correct")
+            print("   2. File extension (.xlsx or .csv)")
+            print("   3. No typos in path")
+            exit(1)
+    
+    # ============================================================================
+    # STEP 2: Load the file
+    # ============================================================================
+    
+    print(f"\n📂 Loading file: {file_found}")
+    
+    if file_found.endswith('.xlsx'):
+        df = pd.read_excel(file_found)
+    elif file_found.endswith('.csv'):
+        df = pd.read_csv(file_found)
     else:
-        raise FileNotFoundError("No input CSV found. Place files under data/predictions/ or data/processed/")
-
-    df_prepared = prepare_predictions_df(df_preds)
-
-    # Export for Power BI
-    export_powerbi_csv(df_prepared, "predictions_powerbi.csv")
-
-    # Optionally create summary CSVs (quick metrics)
-    summary = {
-        "total_customers": len(df_prepared),
-        "churners": int(df_prepared["churn_prediction"].sum()),
-        "churn_rate_pct": float(df_prepared["churn_prediction"].sum() / max(1, len(df_prepared)) * 100),
-        "avg_churn_probability": float(df_prepared["churn_probability"].mean())
+        print("❌ Unsupported file format. Use .xlsx or .csv")
+        exit(1)
+    
+    print(f"   ✅ Loaded {len(df)} rows, {len(df.columns)} columns")
+    print(f"\n📋 Columns in file:")
+    for col in df.columns[:10]:  # Show first 10
+        print(f"      - {col}")
+    if len(df.columns) > 10:
+        print(f"      ... and {len(df.columns) - 10} more columns")
+    
+    # ============================================================================
+    # STEP 3: Clean and prepare data
+    # ============================================================================
+    
+    print("\n🔧 Preparing data for database...")
+    
+    # Convert column names to lowercase with underscores
+    df.columns = df.columns.str.lower().str.replace(' ', '_')
+    
+    # Handle TotalCharges if it's a string
+    if 'totalcharges' in df.columns:
+        if df['totalcharges'].dtype == 'object':
+            df['totalcharges'] = pd.to_numeric(df['totalcharges'], errors='coerce')
+            df['totalcharges'].fillna(0, inplace=True)
+    
+    # Convert Churn to binary if needed
+    if 'churn' in df.columns:
+        if df['churn'].dtype == 'object':
+            df['churn'] = (df['churn'].str.upper() == 'YES').astype(int)
+    
+    # Convert SeniorCitizen to string
+    if 'seniorcitizen' in df.columns:
+        df['seniorcitizen'] = df['seniorcitizen'].map({0: 'No', 1: 'Yes'}).fillna('No')
+    
+    # Remove customerID column if exists (it causes issues)
+    if 'customerid' in df.columns:
+        customer_ids = df['customerid'].copy()
+        df = df.drop('customerid', axis=1)
+        print("   ℹ️  Removed customerid column (will be handled separately)")
+    
+    print(f"   ✅ Data prepared: {len(df)} rows ready")
+    
+    # ============================================================================
+    # STEP 4: Load main predictions table
+    # ============================================================================
+    
+    print("\n1️⃣ Loading PREDICTIONS table...")
+    df.to_sql('predictions', engine, if_exists='replace', index=False, method='multi', chunksize=500)
+    print(f"   ✅ Inserted {len(df)} rows into predictions table")
+    
+    # ============================================================================
+    # STEP 5: Create summary metrics
+    # ============================================================================
+    
+    print("\n2️⃣ Creating SUMMARY_METRICS table...")
+    
+    total_customers = len(df)
+    churned = df['churn'].sum() if 'churn' in df.columns else 0
+    retained = total_customers - churned
+    churn_rate = (churned / total_customers * 100) if total_customers > 0 else 0
+    avg_charges = df['monthlycharges'].mean() if 'monthlycharges' in df.columns else 0
+    avg_tenure = df['tenure'].mean() if 'tenure' in df.columns else 0
+    
+    summary_data = {
+        'metric_name': [
+            'Total Customers',
+            'Churned Customers',
+            'Retained Customers',
+            'Churn Rate (%)',
+            'Avg Monthly Charges',
+            'Avg Tenure (months)'
+        ],
+        'metric_value': [
+            total_customers,
+            churned,
+            retained,
+            round(churn_rate, 2),
+            round(avg_charges, 2),
+            round(avg_tenure, 2)
+        ],
+        'metric_category': [
+            'Overview',
+            'Overview',
+            'Overview',
+            'Overview',
+            'Revenue',
+            'Customer'
+        ]
     }
-    pd.DataFrame([summary]).to_csv(POWERBI_DIR / "summary_metrics.csv", index=False)
-    print(f"✅ Exported summary_metrics.csv")
+    
+    df_summary = pd.DataFrame(summary_data)
+    df_summary.to_sql('summary_metrics', engine, if_exists='replace', index=False)
+    print(f"   ✅ Created {len(df_summary)} summary metrics")
+    
+    # ============================================================================
+    # STEP 6: Create contract analysis
+    # ============================================================================
+    
+    print("\n3️⃣ Creating CONTRACT_ANALYSIS table...")
+    
+    if 'contract' in df.columns and 'churn' in df.columns:
+        contract_df = df[['contract', 'churn']].copy()
+        contract_df = contract_df[contract_df['churn'].isin([0, 1])]
+        
+        contract_stats = contract_df.groupby('contract').agg(
+            customer_count=('churn', 'count'),
+            churners=('churn', 'sum')
+        ).reset_index()
+        
+        contract_stats['avg_churn_prob'] = contract_stats['churners'] / contract_stats['customer_count']
+        contract_stats['churn_rate_pct'] = contract_stats['avg_churn_prob'] * 100
+        
+        # Add additional stats
+        if 'monthlycharges' in df.columns:
+            charges_by_contract = df.groupby('contract')['monthlycharges'].mean().reset_index()
+            charges_by_contract.columns = ['contract', 'avg_monthly_charges']
+            contract_stats = contract_stats.merge(charges_by_contract, on='contract')
+        
+        if 'tenure' in df.columns:
+            tenure_by_contract = df.groupby('contract')['tenure'].mean().reset_index()
+            tenure_by_contract.columns = ['contract', 'avg_tenure']
+            contract_stats = contract_stats.merge(tenure_by_contract, on='contract')
+        
+        contract_stats.to_sql('contract_analysis', engine, if_exists='replace', index=False)
+        print(f"   ✅ Created contract analysis with {len(contract_stats)} rows")
+    
+    # ============================================================================
+    # STEP 7: Create internet analysis
+    # ============================================================================
+    
+    print("\n4️⃣ Creating INTERNET_ANALYSIS table...")
+    
+    if 'internetservice' in df.columns and 'churn' in df.columns:
+        internet_df = df[['internetservice', 'churn']].copy()
+        internet_df = internet_df[internet_df['churn'].isin([0, 1])]
+        
+        internet_stats = internet_df.groupby('internetservice').agg(
+            customer_count=('churn', 'count'),
+            churners=('churn', 'sum')
+        ).reset_index()
+        
+        internet_stats['avg_churn_prob'] = internet_stats['churners'] / internet_stats['customer_count']
+        internet_stats['churn_rate_pct'] = internet_stats['avg_churn_prob'] * 100
+        
+        internet_stats.to_sql('internet_analysis', engine, if_exists='replace', index=False)
+        print(f"   ✅ Created internet analysis with {len(internet_stats)} rows")
+    
+    # ============================================================================
+    # STEP 8: Create tenure analysis
+    # ============================================================================
+    
+    print("\n5️⃣ Creating TENURE_ANALYSIS table...")
+    
+    if 'tenure' in df.columns and 'churn' in df.columns:
+        df['tenure_group'] = pd.cut(
+            df['tenure'],
+            bins=[0, 12, 24, 48, 72, 100],
+            labels=['0-1 years', '1-2 years', '2-4 years', '4-6 years', '6+ years']
+        )
+        
+        tenure_df = df[['tenure_group', 'churn']].copy()
+        tenure_df = tenure_df[tenure_df['churn'].isin([0, 1])]
+        
+        tenure_stats = tenure_df.groupby('tenure_group').agg(
+            customer_count=('churn', 'count'),
+            churners=('churn', 'sum')
+        ).reset_index()
+        
+        tenure_stats['avg_churn_prob'] = tenure_stats['churners'] / tenure_stats['customer_count']
+        tenure_stats['churn_rate_pct'] = tenure_stats['avg_churn_prob'] * 100
+        
+        tenure_stats.to_sql('tenure_analysis', engine, if_exists='replace', index=False)
+        print(f"   ✅ Created tenure analysis with {len(tenure_stats)} rows")
+    
+    # ============================================================================
+    # STEP 9: Create monthly trends
+    # ============================================================================
+    
+    print("\n6️⃣ Creating MONTHLY_TRENDS table...")
+    
+    if 'tenure' in df.columns and 'churn' in df.columns:
+        monthly_data = []
+        
+        for month in range(1, 13):
+            month_df = df[df['tenure'] >= month].copy()
+            if len(month_df) > 0:
+                high_risk = len(month_df[month_df['churn'] == 1])
+                monthly_data.append({
+                    'month': f'Month {month}',
+                    'total_customers': len(month_df),
+                    'churners': high_risk,
+                    'churn_rate_pct': (high_risk / len(month_df) * 100) if len(month_df) > 0 else 0
+                })
+        
+        df_monthly = pd.DataFrame(monthly_data)
+        df_monthly.to_sql('monthly_trends', engine, if_exists='replace', index=False)
+        print(f"   ✅ Created monthly trends with {len(df_monthly)} rows")
+    
+    # ============================================================================
+    # VERIFICATION
+    # ============================================================================
+    
+    print("\n" + "="*80)
+    print("✅ DATA LOADED SUCCESSFULLY!")
+    print("="*80)
+    
+    print("\n📊 Verifying data in PostgreSQL...")
+    
+    tables = ['predictions', 'summary_metrics', 'contract_analysis', 
+              'internet_analysis', 'tenure_analysis', 'monthly_trends']
+    
+    with engine.connect() as conn:
+        for table in tables:
+            result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))
+            count = result.scalar()
+            print(f"   ✅ {table}: {count} rows")
+    
+    print("\n" + "="*80)
+    print("🎯 NEXT STEPS:")
+    print("="*80)
+    print("\n1. Go to Power BI Desktop")
+    print("2. Click 'Refresh' button (or Close & Apply)")
+    print("3. Your tables should now have data!")
+    print("4. Start building your dashboard")
+    print("\n" + "="*80)
 
-    # Contract analysis
-    contract_analysis = df_prepared.groupby("contract").agg(
-        customer_count=("customer_id", "count"),
-        churners=("churn_prediction", "sum"),
-        avg_churn_prob=("churn_probability", "mean"),
-        avg_monthly_charges=("monthly_charges", "mean"),
-        avg_tenure=("tenure", "mean")
-    ).reset_index()
-    contract_analysis["churn_rate_pct"] = (contract_analysis["churners"] / contract_analysis["customer_count"]) * 100
-    contract_analysis.to_csv(POWERBI_DIR / "contract_analysis.csv", index=False)
-    print("✅ Exported contract_analysis.csv")
-
-    # Internet analysis
-    internet_analysis = df_prepared.groupby("internet_service").agg(
-        customer_count=("customer_id", "count"),
-        churners=("churn_prediction", "sum"),
-        avg_churn_prob=("churn_probability", "mean")
-    ).reset_index()
-    internet_analysis["churn_rate_pct"] = (internet_analysis["churners"] / internet_analysis["customer_count"]) * 100
-    internet_analysis.to_csv(POWERBI_DIR / "internet_analysis.csv", index=False)
-    print("✅ Exported internet_analysis.csv")
-
-    # Tenure bins
-    bins = [0, 12, 24, 48, 72, 999]
-    labels = ["0-12m", "12-24m", "24-48m", "48-72m", "72m+"]
-    df_prepared["tenure_group"] = pd.cut(df_prepared["tenure"].fillna(0).astype(int), bins=bins, labels=labels, right=False)
-    tenure_analysis = df_prepared.groupby("tenure_group").agg(
-        customer_count=("customer_id", "count"),
-        churners=("churn_prediction", "sum"),
-        avg_churn_prob=("churn_probability", "mean")
-    ).reset_index()
-    tenure_analysis["churn_rate_pct"] = (tenure_analysis["churners"] / tenure_analysis["customer_count"]) * 100
-    tenure_analysis.to_csv(POWERBI_DIR / "tenure_analysis.csv", index=False)
-    print("✅ Exported tenure_analysis.csv")
-
-    # Monthly trends simple (by simulated month from tenure)
-    monthly = []
-    for m in range(1, 13):
-        subset = df_prepared.loc[df_prepared["tenure"].fillna(0) >= m]
-        monthly.append({
-            "month": m,
-            "active_customers": len(subset),
-            "high_risk_customers": int((subset["risk_level"] == "High").sum()),
-            "predicted_churners": int(subset["churn_prediction"].sum()),
-            "avg_churn_probability": float(subset["churn_probability"].mean()) if len(subset) else 0.0,
-            "revenue_at_risk": float(subset.loc[subset["risk_level"] == "High", "monthly_charges"].sum())
-        })
-    pd.DataFrame(monthly).to_csv(POWERBI_DIR / "monthly_trends.csv", index=False)
-    print("✅ Exported monthly_trends.csv")
-
-    # Optionally load to Postgres if env var provided
-    if DATABASE_URL and SQLALCHEMY_AVAILABLE:
-        print("➡️ DATABASE_URL set; attempting to load `predictions` table into Postgres")
-        load_to_postgres(df_prepared, "predictions")
-    elif DATABASE_URL and not SQLALCHEMY_AVAILABLE:
-        print("⚠️ DATABASE_URL set but SQLAlchemy not installed. Skipping DB load.")
-
-    print("\nAll Power BI files saved under:", POWERBI_DIR.resolve())
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Prepare CSVs for Power BI and optionally load to Postgres")
-    parser.add_argument("--predictions", help="Path to predictions CSV (default: data/predictions/predictions.csv)")
-    parser.add_argument("--engineered", help="Path to engineered CSV (default: data/processed/churn_engineered.csv)")
-    parser.add_argument("--raw", help="Path to raw CSV (default: data/raw/Telco-Customer-Churn.csv)")
-    args = parser.parse_args()
-    main(args)
+except Exception as e:
+    print(f"\n❌ ERROR: {str(e)}")
+    print("\n🔍 Troubleshooting:")
+    print("1. Make sure PostgreSQL is running")
+    print("2. Check database password: postgres123")
+    print("3. Verify database exists: churn_analytics")
+    print("4. Install packages: pip install pandas sqlalchemy psycopg2-binary openpyxl")
+    print("\n💡 If error persists, share the error message!")
+    
+    import traceback
+    print("\n📋 Full error details:")
+    traceback.print_exc()
