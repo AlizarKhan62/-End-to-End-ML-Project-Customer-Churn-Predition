@@ -48,15 +48,30 @@ st.markdown("""
         color: white;
         font-weight: bold;
     }
+    .logo-img {
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      border-radius: 50px;
+    }
+
     </style>
 """, unsafe_allow_html=True)
 
 # =========================
-# Header
+# Header + Brand Logo
 # =========================
-st.markdown("<div class='header-title'>📊 Customer Churn Prediction</div>", unsafe_allow_html=True)
-st.markdown("<div class='header-subtitle'>Predict the likelihood of a customer leaving your service</div>", unsafe_allow_html=True)
+col_logo, col_title = st.columns([1, 5])
+
+with col_logo:
+    # Placeholder for logo
+    st.image("icons/Telecom_arg_logo.png", width=100)  # 👈 You can replace this path with your actual logo later
+with col_title:
+    st.markdown("<div class='header-title'>📊 Customer Churn Prediction</div>", unsafe_allow_html=True)
+    st.markdown("<div class='header-subtitle'>Predict the likelihood of a customer leaving your service</div>", unsafe_allow_html=True)
+
 st.markdown("---")
+
 
 # =========================
 # Sidebar Form
