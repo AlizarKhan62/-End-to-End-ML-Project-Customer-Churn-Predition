@@ -165,12 +165,14 @@ It uses the popular **Telco Customer Churn dataset**, where the goal is to predi
 
 | Section                                 | Screenshot                                              |
 | --------------------------------------- | ------------------------------------------------------- |
-| **Streamlit App Homepage**              | ![Streamlit App UI](docs/images/streamlit_ui.png)       |
-| **Prediction Output**                   | ![Prediction Result](docs/images/prediction_result.png) |
-| **Power BI Page 1 (Overview)**          | ![Power BI Overview](docs/images/powerbi_page1.png)     |
-| **Power BI Page 2 (Customer Analysis)** | ![Power BI Analysis](docs/images/powerbi_page2.png)     |
-| **MLflow Tracking**                     | ![MLflow UI](docs/images/mlflow_tracking.png)           |
-| **Dockerized Deployment**               | ![Docker Setup](docs/images/docker_setup.png)           |
+| **Streamlit App Homepage**              | ![Streamlit App UI](docs/images/Home.png)       |
+| **Prediction Output**                   | ![Prediction Result](docs/images/App.png) |
+| **Power BI Page 1 (Overview)**          | ![Power BI Overview](docs/images/page1.png)     |
+| **Power BI Page 2 (Customer Analysis)** | ![Power BI Analysis](docs/images/page2.png)     |
+| **Power BI Page 3 (Customer Tooltip)**  | ![Power BI Analysis](docs/images/page3.png)     |
+| **EDA (Jupyter Notebook)**              | ![Notebook](docs/images/backend.png)     |
+| **MLflow Tracking**                     | ![MLflow UI](docs/images/mlflow.png)           |
+| **Dockerized Deployment**               | ![Docker Setup](docs/images/docker.png)           |
 
 ---
 
