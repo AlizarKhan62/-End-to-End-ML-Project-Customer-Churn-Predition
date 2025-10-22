@@ -32,4 +32,4 @@ logs/*.log
 .pytest_cache/
 htmlcov/
 
-pyproject.toml
+.toml
