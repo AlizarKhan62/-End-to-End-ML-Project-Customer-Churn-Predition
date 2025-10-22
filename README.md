@@ -1,10 +1,4 @@
-Perfect ✅ — here’s your **final, complete `README.md`** for the **Customer Churn Prediction (End-to-End ML Project)** — professionally written, ATS & recruiter-friendly, with placeholders for screenshots, diagrams, and deployment info.
 
-You can copy this file as `README.md` and push it directly to your GitHub repository root.
-
----
-
-````markdown
 # 💼 End-to-End Customer Churn Prediction System
 
 > **An enterprise-level machine learning project that predicts telecom customer churn, visualizes insights with Power BI, tracks experiments with MLflow, and deploys an interactive web app using Streamlit Cloud.**
