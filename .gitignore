@@ -31,3 +31,5 @@ logs/*.log
 .coverage
 .pytest_cache/
 htmlcov/
+
+pyproject.toml
