@@ -1,9 +1,30 @@
-# Core app
-streamlit==1.37.1
+# Streamlit Cloud Compatible Requirements
+# Python 3.11 (see runtime.txt)
 
-# Data / ML
+# Core Framework
+streamlit==1.37.1
+python-dotenv==1.0.0
+
+# Data Processing
 pandas==2.2.2
-numpy==1.26.4
-scikit-learn==1.5.2
+numpy==1.26.2
+
+# Machine Learning
+scikit-learn==1.3.2
+xgboost==2.0.2
+lightgbm==4.1.0
+
+# Model Persistence (REPLACES pickle5)
 joblib==1.3.2
-pickle5==0.0.12
+
+# Visualization
+matplotlib==3.8.2
+seaborn==0.13.0
+plotly==5.18.0
+
+# Utilities
+requests==2.31.0
+
+# Optional - Only if you use these
+# shap==0.43.0  # Uncomment if needed
+# mlflow==2.8.1  # Uncomment if needed
